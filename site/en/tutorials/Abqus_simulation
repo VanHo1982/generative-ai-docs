@@ -1,0 +1,54 @@
+subroutine UMAT(STRESS, STATEV, DSTRAN, 
+     &                TIME, DTIME, TEMP, DTEMP, 
+     &                PREDEF, DPRED, CMNAME, 
+     &                NDI, NSHR, NTENS, 
+     &                NSTATV, PROPS, 
+     &                NPROPS, COORDS, DROT, 
+     &                PNEWDT, CELENT, DFGRD0, DFGRD1, 
+     &                NOEL, NPT, LAYER, KSPT, 
+     &                JMAC, JMATYP, MATLAY, 
+     &                LFLAGS
+)
+C
+      include 'ABA_PARAM.INC'
+C
+      CHARACTER*80 CMNAME
+      DIMENSION STRESS(NTENS), STATEV(NSTATV), DSTRAN(NTENS)
+      DIMENSION TIME(2), PREDEF(*), DPRED(*)
+      DIMENSION PROPS(*)
+      DIMENSION COORDS(3), DROT(3,3)
+      DIMENSION DFGRD0(3,3), DFGRD1(3,3)
+! Material properties from PROPS
+      REAL*8 :: conc_resin, conc_initiator, photo_decomp_rate
+      REAL*8 :: kP, kT, absorbance, curing_fraction
+      REAL*8 :: E_initial, E_cured, E
+      REAL*8 :: delta_E, UV_intensity
+
+! Initialize material properties
+      conc_resin      = PROPS(1)  ! 3000 mol/m^3
+      conc_initiator  = PROPS(2)  ! 20 mol/m^3
+      photo_decomp_rate= PROPS(3)  ! 8e-4 s^2/kg
+      kP              = PROPS(4)  ! 0.21 m³/mol·s
+      kT              = PROPS(5)  ! 0.21 m³/mol·s
+      absorbance      = PROPS(6)  ! 600 m⁻¹
+      
+! Define initial and cured modulus
+      E_initial = PROPS(7)  ! Modulus before curing
+      E_cured   = PROPS(8)  ! Modulus after curing
+
+! Get UV intensity from external source (load or time)
+      CALL GET_UV_INTENSITY(UV_intensity, COORDS, TIME)
+
+! Curing kinetics (simplistic model)
+! Curing fraction based on UV intensity and time
+      curing_fraction = 1.0 - EXP(-kP * UV_intensity * TIME(1))
+      IF (curing_fraction > 1.0) curing_fraction = 1.0
+      
+! Update modulus based on curing fraction
+      E = E_initial + curing_fraction * (E_cured - E_initial)
+      
+! Assign stress based on linear elastic model with updated modulus
+      STRESS = E * DSTRAN
+
+      RETURN
+      END
